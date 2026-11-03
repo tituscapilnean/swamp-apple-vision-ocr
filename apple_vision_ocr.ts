@@ -290,6 +290,36 @@ export function parseRecognizeOutput(
   return parsed.data;
 }
 
+/** Result of running osascript; stdout/stderr already decoded. */
+export type OsascriptResult = { code: number; stdout: string; stderr: string };
+
+/**
+ * Process-level seams, replaceable in tests: the platform check and the
+ * osascript runner. Production code uses the real ones.
+ */
+export const deps = {
+  platform: (): string => Deno.build.os,
+  runOsascript: async (
+    args: string[],
+    signal: AbortSignal,
+  ): Promise<OsascriptResult> => {
+    // osascript is the only way to reach Vision without native deps; every argument is fixed or a temp file we wrote.
+    // swamp-quality-ignore deno-command
+    const out = await new Deno.Command("osascript", {
+      args,
+      stdout: "piped",
+      stderr: "piped",
+      signal,
+    }).output();
+    const dec = new TextDecoder();
+    return {
+      code: out.code,
+      stdout: dec.decode(out.stdout),
+      stderr: dec.decode(out.stderr),
+    };
+  },
+};
+
 async function recognize(
   paths: string[],
   g: GlobalArgs,
@@ -309,20 +339,16 @@ async function recognize(
         correction: g.languageCorrection,
       }),
     );
-    // osascript is the only way to reach Vision without native deps; every argument is fixed or a temp file we wrote.
-    // swamp-quality-ignore deno-command
-    const { code, stdout, stderr } = await new Deno.Command("osascript", {
-      args: ["-l", "JavaScript", script, cfgFile],
-      stdout: "piped",
-      stderr: "piped",
-      signal,
-    }).output();
+    const { code, stdout, stderr } = await deps.runOsascript([
+      "-l",
+      "JavaScript",
+      script,
+      cfgFile,
+    ], signal);
     if (code !== 0) {
-      throw new Error(
-        `osascript exited ${code}: ${new TextDecoder().decode(stderr).trim()}`,
-      );
+      throw new Error(`osascript exited ${code}: ${stderr.trim()}`);
     }
-    return parseRecognizeOutput(new TextDecoder().decode(stdout), paths.length);
+    return parseRecognizeOutput(stdout, paths.length);
   } finally {
     await Deno.remove(dir, { recursive: true });
   }
@@ -352,6 +378,14 @@ export function toImageResult(raw: RawResult, patterns: string[]): ImageResult {
 export const model = {
   type: "@tituscapilnean/apple-vision-ocr",
   version: "2026.11.02.2",
+  upgrades: [
+    {
+      toVersion: "2026.11.02.2",
+      description:
+        "Publish from the standalone repo with the model spelling; no globalArguments change",
+      upgradeAttributes: (old: Record<string, unknown>) => old,
+    },
+  ],
   globalArguments: GlobalArgsSchema,
   resources: {
     scan: {
@@ -385,7 +419,7 @@ export const model = {
           ) => Promise<{ name: string }>;
         },
       ) => {
-        if (Deno.build.os !== "darwin") {
+        if (deps.platform() !== "darwin") {
           throw new Error(
             "apple-vision-ocr needs macOS: it uses the Vision framework through osascript",
           );

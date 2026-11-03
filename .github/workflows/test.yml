@@ -11,4 +11,4 @@ jobs:
         with:
           deno-version: 2.9.8
       - run: deno check apple_vision_ocr.ts
-      - run: deno test
+      - run: deno test --allow-read --allow-write
