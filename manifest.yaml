@@ -1,0 +1,26 @@
+manifestVersion: 1
+name: "@tituscapilnean/apple-vision-ocr"
+version: "2026.11.02.2"
+license: MIT
+description: >-
+  Read the text in local images with Apple's on-device Vision framework and
+  their TIFF/IPTC copyright metadata, then flag images carrying copyright
+  notices or watermarks (©, "all rights reserved", stock agencies, cartoon
+  syndicates, meme generators). macOS only; nothing to install, no network.
+repository: https://github.com/tituscapilnean/swamp-apple-vision-ocr
+visibility: public
+paths:
+  base: manifest
+models:
+  - apple_vision_ocr.ts
+additionalFiles:
+  - README.md
+  - LICENSE.txt
+platforms:
+  - darwin-aarch64
+  - darwin-x86_64
+labels:
+  - ocr
+  - images
+  - copyright
+  - macos
